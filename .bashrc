@@ -117,14 +117,6 @@ apidoc()
 	php artisan l5-swagger:generate
 }
 
-token()
-{
-curl --request POST \
-  --url https://dev-l64fsyd7.us.auth0.com/oauth/token \
-  --header 'content-type: application/json' \
-  --data '{"client_id":"KSWLdLJvXHrQtS3gomVO3T0c2kcieaE6","client_secret":"TDvmoVWF4sKe4kbMUFJlHSv68k9AXJJrqYv6c3y0SX4zfZZAXs479mQcAuwOBlEr","audience":"https://test.test.com","grant_type":"client_credentials"}'
-}
-
 tinker()
 {
 	~/tinx.sh
@@ -153,7 +145,6 @@ s()
 	umask 000
 	php spark "$@"
 }
-
 
 carbro-prod()
 {
@@ -203,8 +194,6 @@ fixpath()
 	# SETX COMPOSE_CONVERT_WINDOWS_PATHS 1
 	export COMPOSE_CONVERT_WINDOWS_PATHS=1
 }
-
-
 
 npmw()
 {
