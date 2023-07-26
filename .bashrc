@@ -262,7 +262,7 @@ d-up()
 	case "${PWD##*/}" in
 
 	  shopper-shadow-backend)
-		docker-compose up -d ci4
+		docker-compose up -d
 		docker cp ~/.bashrc $(docker ps |grep ci4|awk '{print $1}' | head -1):/home/bitnami/.bashrc
 		docker cp ~/.bashrc $(docker ps |grep ci4|awk '{print $1}' | head -1):/root/.bashrc
 		;;
