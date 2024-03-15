@@ -158,21 +158,6 @@ carbro-test()
 	docker exec -ti $(docker ps |grep web|awk '{print $1}' | head -1) bash
 }
 
-casafy-test()
-{
-	ssh 18.231.186.177
-	#ssh 15.228.59.22
-}
-
-casafy-prod()
-{
-	ssh 18.229.160.32
-}
-casafy-prod2()
-{
-	ssh 18.230.187.26
-}
-
 ss-test()
 {
 	ssh -t shopper-shadow.test.code-lab.it "bash"
@@ -241,6 +226,8 @@ userm()
 
 dl()
 {
+  # docker exec -it $(docker ps --filter name=ci4 -q|head -n 1) bash
+
 	case "${PWD##*/}" in
 
 	  shopper-shadow-backend)
@@ -297,4 +284,38 @@ log()
 		;;
 	esac
 
+}
+
+fetch-db()
+{
+    local host="$1"
+    local container_name="$2"
+    local mysql_host="$3"
+    local mysql_user="$4"
+    local mysql_password="$5"
+    local dbname="$6"
+
+    ssh "$host" "docker exec -i \$(docker ps --filter name=$container_name -q|head -n 1) mysqldump -h $mysql_host -u$mysql_user -p$mysql_password $dbname|gzip" > "$dbname".sql.gz
+}
+
+get-db()
+{
+    local server="$1"
+
+    case $server in
+
+      gardest)
+      fetch-db "test.gardest.code-lab.it" "test_gardest_code-lab_it_db" "10.0.7.3" "wp" "phj5DkjRpfSajdWl4kE94fDa" "wp"
+      ;;
+
+      shopper-shadow)
+      fetch-db "shopper-shadow.test.code-lab.it" "shopper-shadow-backend-test-server_mysql" "localhost" "ci4_test" "kjrdAk3Gd8mFa#mFkasGfs" "ci4_test"
+      ;;
+
+      *)
+      echo -n "unknown server"
+      ;;
+    esac
+
+    ssh "$host" "docker exec -i \$(docker ps --filter name=$container_name -q|head -n 1) mysqldump -h $mysql_host -u$mysql_user -p$mysql_password $dbname|gzip" > "$dbname".sql.gz
 }
