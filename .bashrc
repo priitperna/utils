@@ -148,13 +148,7 @@ s()
 
 carbro-prod()
 {
-	ssh 18.185.111.63
-}
-
-carbro-test()
-{
-	ssh 173.212.194.28 # contabo
-
+	ssh 3.125.122.67
 	docker exec -ti $(docker ps |grep web|awk '{print $1}' | head -1) bash
 }
 
@@ -295,7 +289,7 @@ fetch-db()
     local mysql_password="$5"
     local dbname="$6"
 
-    ssh "$host" "docker exec -i \$(docker ps --filter name=$container_name -q|head -n 1) mysqldump -h $mysql_host -u$mysql_user -p$mysql_password $dbname|gzip" > "$dbname".sql.gz
+    ssh "$host" "docker exec -i \$(docker ps --filter name=$container_name -q|head -n 1) mariadb-dump -h $mysql_host -u$mysql_user -p$mysql_password $dbname|gzip" > "$dbname".sql.gz
 }
 
 get-db()
@@ -305,11 +299,15 @@ get-db()
     case $server in
 
       gardest)
-      fetch-db "test.gardest.code-lab.it" "test_gardest_code-lab_it_db" "10.0.7.3" "wp" "phj5DkjRpfSajdWl4kE94fDa" "wp"
+      fetch-db "test.gardest.code-lab.it" "test_gardest_code-lab_it_db" "10.0.7.3" "wp" "phj5DkjRpfSajdWl4kE94fDa" "wp" "mysqldump"
       ;;
 
       shopper-shadow)
-      fetch-db "shopper-shadow.test.code-lab.it" "shopper-shadow-backend-test-server_mysql" "localhost" "ci4_test" "kjrdAk3Gd8mFa#mFkasGfs" "ci4_test"
+      fetch-db "shopper-shadow.test.code-lab.it" "shopper-shadow-backend-test-server_mysql" "localhost" "ci4_test" "kjrdAk3Gd8mFa#mFkasGfs" "ci4_test" "mysqldump"
+      ;;
+
+      carbro)
+      ssh 3.125.122.67 "docker exec -i \$(docker ps --filter name=car-bro-crm-main_mysqldb -q|head -n 1) mariadb-dump -h 172.17.0.1 -ucarbro -pd3akjdSay4#sm@Rs carbro|gzip" > carbro.sql.gz
       ;;
 
       *)
