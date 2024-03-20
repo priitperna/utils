@@ -222,18 +222,23 @@ dl()
 {
   # docker exec -it $(docker ps --filter name=ci4 -q|head -n 1) bash
 
-	case "${PWD##*/}" in
+	case "${PWD}" in
 
-	  shopper-shadow-backend)
+	  /home/priit/code/shopper-shadow-backend)
 		docker-compose exec -w /app/myapp --user bitnami ci4 bash
 		;;
 
-	  Casafy | Carbro)
+	  /home/priit/code/car-bro-crm)
 		docker-compose exec --user www-data nginx bash
+		;;
+
+	  /home/priit/code/gardest)
+		docker-compose exec -w /var/www/html --user www-data php bash
 		;;
 
 	  *)
 		echo -n "unknown project"
+		echo -n "${PWD}"
 		;;
 	esac
 }
@@ -303,7 +308,7 @@ get-db()
       ;;
 
       shopper-shadow)
-      fetch-db "shopper-shadow.test.code-lab.it" "shopper-shadow-backend-test-server_mysql" "localhost" "ci4_test" "kjrdAk3Gd8mFa#mFkasGfs" "ci4_test" "mysqldump"
+      ssh shopper-shadow.test.code-lab.it "docker exec -i \$(docker ps --filter name=shopper-shadow-backend-test-server_mysql -q|head -n 1) mysqldump -h localhost -uci4_test -pkjrdAk3Gd8mFa#mFkasGfs ci4_test|gzip" > ci4_test.sql.gz
       ;;
 
       carbro)
