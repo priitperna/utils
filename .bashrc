@@ -280,11 +280,21 @@ d-up()
 
 log()
 {
+  local env="$1"
+
 	now=$(date +'%Y-%m-%d')
 	case "${PWD##*/}" in
 
 	  shopper-shadow-backend)
-		grc -c ~/.grc/.grc.conf tail -f writable/logs/log-${now}.log
+	    case "${env}" in
+        test)
+          ssh shopper-shadow.test.code-lab.it "docker exec -i \$(docker ps --filter name=ci4 -q|head -n 1) tail -f /app/myapp/writable/logs/log-$now.log"
+        ;;
+        *)
+        echo -n "unknown env"
+        ;;
+      esac
+		  grc -c ~/.grc/.grc.conf tail -f writable/logs/log-${now}.log
 		;;
 
 	  Casafy | Carbro)
