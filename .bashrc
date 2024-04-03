@@ -200,6 +200,7 @@ ide()
 cmod()
 {
 	usermod -u 1000 www-data
+	groupmod -g 1000 www-data
 	chown -R 1000:1000 ./*
 	chown -R www-data:www-data storage/logs
 	chown -R www-data:www-data storage/logs/*
@@ -220,27 +221,39 @@ userm()
 
 dl()
 {
-  # docker exec -it $(docker ps --filter name=ci4 -q|head -n 1) bash
+  local custom="$1"
+  local user="$2"
 
-	case "${PWD}" in
+  if [ -z "$custom" ]; then
+    case "${PWD}" in
 
-	  /home/priit/code/shopper-shadow-backend)
-		docker-compose exec -w /app/myapp --user bitnami ci4 bash
-		;;
+    	  /home/priit/code/shopper-shadow-backend)
+    		docker-compose exec -w /app/myapp --user bitnami ci4 bash
+    		;;
 
-	  /home/priit/code/car-bro-crm)
-		docker-compose exec --user www-data nginx bash
-		;;
+    	  /home/priit/code/car-bro-crm)
+    		docker-compose exec --user www-data nginx bash
+    		;;
 
-	  /home/priit/code/gardest)
-		docker-compose exec -w /var/www/html --user www-data php bash
-		;;
+    	  /home/priit/code/gardest)
+    		docker-compose exec -w /var/www/html --user www-data php bash
+    		;;
 
-	  *)
-		echo -n "unknown project"
-		echo -n "${PWD}"
-		;;
-	esac
+    	  *)
+    		echo -n "unknown project"
+    		echo -n "${PWD}"
+    		;;
+    	esac
+    return
+  fi
+
+  if [ -z "$user" ]; then
+    user=root
+  fi
+
+  docker exec -it -u"$user" "$(docker ps --filter name="$custom" -q|head -n 1)" bash
+
+
 }
 
 d-up()
