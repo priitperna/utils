@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 cp .bashrc ~/.bashrc
-cp .grc.conf ~/.grc.conf
+cp .grc.conf ~/.grc/.grc.conf
