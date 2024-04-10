@@ -180,14 +180,24 @@ npmw()
 	npm run watch-poll
 }
 
-deploy-test()
+dt()
 {
+  case "${PWD##*/}" in
+
+      gardest)
+      testBranch="test"
+      ;;
+      *)
+      testBranch="test-server"
+      ;;
+    esac
+
 	currentBranch=$(git rev-parse --abbrev-ref HEAD)
-	git checkout test-server
+	git checkout "$testBranch"
 	git pull
-	git merge $currentBranch --no-edit
+	git merge "$currentBranch" --no-edit
 	git push
-	git checkout $currentBranch
+	git checkout "$currentBranch"
 }
 
 ide()
