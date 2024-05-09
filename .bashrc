@@ -184,7 +184,7 @@ dt()
 {
   case "${PWD##*/}" in
 
-      gardest)
+      php)
       testBranch="test"
       ;;
       *)
