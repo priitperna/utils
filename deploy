@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
 
 cp .bashrc ~/.bashrc
+#mkdir ~/.grc
 cp .grc.conf ~/.grc/.grc.conf
+
+source ~/.bashrc

@@ -237,16 +237,8 @@ dl()
   if [ -z "$custom" ]; then
     case "${PWD}" in
 
-    	  /home/priit/code/shopper-shadow-backend)
-    		docker-compose exec -w /app/myapp --user bitnami ci4 bash
-    		;;
-
-    	  /home/priit/code/car-bro-crm)
-    		docker-compose exec --user www-data nginx bash
-    		;;
-
-    	  /home/priit/code/gardest)
-    		docker-compose exec -w /var/www/html --user www-data php bash
+    	  /home/priit/code/api)
+    	    docker compose exec -u fractory api bash
     		;;
 
     	  *)
@@ -262,24 +254,25 @@ dl()
   fi
 
   docker exec -it -u"$user" "$(docker ps --filter name="$custom" -q|head -n 1)" bash
+}
+
+alias op="/mnt/c/Users/priit/AppData/Local/Microsoft/WinGet/Packages/AgileBits.1Password.CLI_Microsoft.Winget.Source_8wekyb3d8bbwe/op.exe"
+
+tests()
+{
+    php artisan test --parallel --testsuite Unit,Modules-Unit,Functional,Feature --processes=12
 
 
 }
 
 d-up()
 {
-	case "${PWD##*/}" in
+	case "${PWD}" in
 
-	  shopper-shadow-backend)
+	  /home/priit/code/api)
 		docker-compose up -d
-		docker cp ~/.bashrc $(docker ps |grep ci4|awk '{print $1}' | head -1):/home/bitnami/.bashrc
-		docker cp ~/.bashrc $(docker ps |grep ci4|awk '{print $1}' | head -1):/root/.bashrc
-		;;
-
-	  Casafy | Carbro)
-		docker-compose up -d nginx redis
-		docker cp ~/.bashrc $(docker ps |grep nginx|awk '{print $1}' | head -1):/var/www/.bashrc
-		docker cp ~/.bashrc $(docker ps |grep nginx|awk '{print $1}' | head -1):/root/.bashrc
+		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/home/fractory/.bashrc
+		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/root/.bashrc
 		;;
 
 	  *)
@@ -354,6 +347,58 @@ get-db()
     esac
 
     ssh "$host" "docker exec -i \$(docker ps --filter name=$container_name -q|head -n 1) mysqldump -h $mysql_host -u$mysql_user -p$mysql_password $dbname|gzip" > "$dbname".sql.gz
+}
+
+s3()
+{
+    if [ "$1" == "get" ]; then
+        OPERATION="GET"
+    elif [ "$1" == "put" ]; then
+        OPERATION="PUT"
+    else
+        echo "First parameter must be get or put, was \"$1\""
+        OPERATION="FAIL"
+    fi
+
+    if [ "$2" == "staging" ]; then
+        NAME="env-staging"
+        BUCKET="fractory-test"
+    elif [ "$2" == "production" ]; then
+        NAME="env-production"
+        BUCKET="fractory-prod"
+    else
+        echo "Second parameter must be staging or production, was \"$2\""
+        return
+    fi
+
+    if [ "$OPERATION" == "GET" ]; then
+        aws s3 cp s3://fractory-test/.env env-staging
+        return
+    fi
+
+    # aws s3 cp s3://$BUCKET/.env $NAME
+
+    if [ "$OPERATION" != "PUT" ]; then
+        return
+    fi
+
+    aws s3 cp s3://$BUCKET/.env "$NAME-backup"
+    DIFF=$(diff --color "$NAME-backup" $NAME)
+    echo "$DIFF"
+    if [ "$DIFF" == "" ]; then
+        echo "No difference between $NAME-backup and $NAME. Exiting"
+        return
+    fi
+
+    echo  # new line
+    read -p "Proceed with $NAME upload to $BUCKET (press y or n)? " -n 1 -r
+    echo  # new line
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+        aws s3 cp $NAME s3://$BUCKET/.env --sse
+    else
+        echo "Exiting"
+    fi
 }
 
 export NVM_DIR="$HOME/.nvm"
