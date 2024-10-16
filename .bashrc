@@ -152,17 +152,6 @@ carbro-prod()
 	docker exec -ti $(docker ps |grep web|awk '{print $1}' | head -1) bash
 }
 
-ss-test()
-{
-	ssh -t shopper-shadow.test.code-lab.it "bash"
-	docker exec -ti $(docker ps |grep cl_shoppersh|awk '{print $1}' | head -1) bash
-}
-
-ss-prod()
-{
-	ssh 18.229.160.32
-}
-
 login()
 {
 	eval $(aws ecr get-login --no-include-email --region eu-west-1 --profile registry-ro)
