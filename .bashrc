@@ -136,8 +136,8 @@ copy-bashrc-ci()
 
 a()
 {
-	umask 000
-	php artisan "$@"
+    local ARGS="$@"
+    docker compose exec -u fractory api bash -c "php artisan $ARGS"
 }
 
 s()
@@ -184,11 +184,12 @@ dt()
 {
   case "${PWD##*/}" in
 
-      php)
-      testBranch="test"
+      api | shipping-microservice | document-assembler | web)
+      testBranch="staging"
       ;;
       *)
-      testBranch="test-server"
+      echo -n "unknown project"
+      return
       ;;
     esac
 
@@ -265,14 +266,19 @@ tests()
 
 }
 
-d-up()
+up()
 {
 	case "${PWD}" in
 
 	  /home/priit/code/api)
 		docker-compose up -d
+		docker compose exec -u root api bash -c "chmod 777 /var/log/newrelic/newrelic-daemon.log"
 		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/home/fractory/.bashrc
 		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/root/.bashrc
+		;;
+
+	  /home/priit/code/web)
+		cd admin && npm run start
 		;;
 
 	  *)
@@ -372,7 +378,7 @@ s3()
     fi
 
     if [ "$OPERATION" == "GET" ]; then
-        aws s3 cp s3://fractory-test/.env env-staging
+        aws s3 cp s3://$BUCKET/.env $NAME
         return
     fi
 
