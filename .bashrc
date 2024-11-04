@@ -177,6 +177,11 @@ dt()
       testBranch="staging"
       ;;
       *)
+      admin | client)
+      cd ..
+      testBranch="staging"
+      ;;
+      *)
       echo -n "unknown project"
       return
       ;;
@@ -227,12 +232,16 @@ dl()
   if [ -z "$custom" ]; then
     case "${PWD}" in
 
+    	  /home/priit/private/car-bro-crm)
+    	    docker compose exec --user www-data nginx bash
+    		;;
+
     	  /home/priit/code/api)
     	    docker compose exec -u fractory api bash
     		;;
 
     	  *)
-    		echo -n "unknown project"
+    		echo -n "unknown project: "
     		echo -n "${PWD}"
     		;;
     	esac
@@ -268,6 +277,10 @@ up()
 
 	  /home/priit/code/web)
 		cd admin && npm run start
+		;;
+
+	  /home/priit/code/web/admin | /home/priit/code/web/client)
+		npm run start
 		;;
 
 	  *)
