@@ -176,7 +176,6 @@ dt()
       api | shipping-microservice | document-assembler | web)
       testBranch="staging"
       ;;
-      *)
       admin | client)
       cd ..
       testBranch="staging"
