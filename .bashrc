@@ -176,7 +176,6 @@ dt()
       api | shipping-microservice | document-assembler | web)
       testBranch="staging"
       ;;
-      *)
       admin | client)
       cd ..
       testBranch="staging"
@@ -232,7 +231,7 @@ dl()
   if [ -z "$custom" ]; then
     case "${PWD}" in
 
-    	  /home/priit/private/car-bro-crm || /home/priit/code/car-bro-crm)
+    	  /home/priit/private/car-bro-crm | /home/priit/code/car-bro-crm)
     	    docker compose exec --user www-data nginx bash
     		;;
 
