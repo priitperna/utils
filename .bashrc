@@ -283,6 +283,11 @@ up()
 		npm run start
 		;;
 
+      /home/priit/code/car-bro-crm)
+        docker-compose up -d
+        docker cp ~/.bashrc $(docker ps |grep nginx|awk '{print $1}' | head -1):/var/www/.bashrc
+        docker cp ~/.bashrc $(docker ps |grep nginx|awk '{print $1}' | head -1):/root/.bashrc
+        ;;
 	  *)
 		echo -n "unknown project"
 		;;
@@ -412,3 +417,6 @@ s3()
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+
+# route add 3.125.122.67 MASK 255.255.255.0 192.168.0.2
