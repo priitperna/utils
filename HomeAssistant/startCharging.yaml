@@ -1,0 +1,18 @@
+alias: EV Smart Charge - Start Charging
+description: Turns on the EV charger at the scheduled start time
+trigger:
+  - platform: time_pattern
+    minutes: 0
+    seconds: 0
+condition:
+  - condition: state
+    entity_id: sensor.laadimise_olek_2
+    state: "Plugged in"
+  - condition: template
+    value_template: >
+      {{ now().hour == (states('input_number.charging_start') | int(0)) }}
+action:
+  - service: switch.turn_on
+    target:
+      entity_id: switch.zoe_3em
+mode: single

@@ -1,0 +1,194 @@
+alias: EV Smart Charge - Set Schedule on Plug-in
+description: >-
+  Calculates and populates the start time and duration when the car is plugged
+  in
+trigger:
+  - platform: state
+    entity_id: sensor.laadimise_olek_2
+    to: "Plugged in"
+condition: []
+action:
+  - service: input_number.set_value
+    target:
+      entity_id: input_number.charging_time
+    data:
+      value: "{{ [ (states('sensor.ev_charging_hours_needed') | float(0)) | int(0), 0 ] | max }}"
+  - delay: "00:00:01"
+  - service: input_number.set_value
+    target:
+      entity_id: input_number.charging_start
+    data:
+      value: >
+        {# PART 1: Define variables. #}
+        {% set nordpool_sensor = 'sensor.nordpool' %}
+        {% set charge_hours = states('input_number.charging_time') | int(0) %}
+        {% set end_time_str = '08:00' %}
+
+        {# PART 2: Get price arrays #}
+        {% set prices_today = state_attr(nordpool_sensor, 'today') %}
+        {% set prices_tomorrow = state_attr(nordpool_sensor, 'tomorrow') %}
+        {% set tomorrow_valid = state_attr(nordpool_sensor, 'tomorrow_valid') %}
+        {% set t_valid = (tomorrow_valid is boolean and tomorrow_valid) or ((tomorrow_valid|string)|lower in ['true','1','yes','on']) %}
+
+        {# Normalize to a list of {start: datetime, value: float} #}
+        {% set hourly_data = [] %}
+
+        {# Helper to normalize one day list. If items are dicts with 'start'/'value', use them; else use index hour. #}
+        {% if prices_today is not none and prices_today|string != 'unknown' and prices_today != [] %}
+          {% for item in prices_today %}
+            {% if item is mapping %}
+              {# Use as_datetime to safely parse, then convert to local exactly once #}
+              {% set raw_dt = as_datetime(item.start) %}
+              {% set dt_obj = as_local(raw_dt) %}
+              {% set val = (item.value if 'value' in item else item.price) | float(0) %}
+            {% else %}
+              {% set dt_obj = today_at(loop.index0 ~ ':00') %}
+              {% set val = item | float(0) %}
+            {% endif %}
+            {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+          {% endfor %}
+        {% endif %}
+
+        {% if t_valid and prices_tomorrow is not none and prices_tomorrow|string != 'unknown' and prices_tomorrow != [] %}
+          {% for item in prices_tomorrow %}
+            {% if item is mapping %}
+              {% set raw_dt = as_datetime(item.start) %}
+              {% set dt_obj = as_local(raw_dt) %}
+              {% set val = (item.value if 'value' in item else item.price) | float(0) %}
+            {% else %}
+              {% set dt_obj = (today_at(loop.index0 ~ ':00') + timedelta(days=1)) %}
+              {% set val = item | float(0) %}
+            {% endif %}
+            {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+          {% endfor %}
+        {% endif %}
+
+        {# PART 3: Filter available slots between next full hour and the deadline. #}
+        {% set now_dt = now() %}
+        {% set next_full_hour = (now_dt.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)) %}
+        {% set end_time_tomorrow = today_at(end_time_str) + timedelta(days=1) %}
+
+        {# Ensure chronological order explicitly #}
+        {% set hourly_sorted = hourly_data | sort(attribute='start') %}
+
+        {% set available_slots = [] %}
+        {% for slot in hourly_sorted %}
+          {% if slot.start >= next_full_hour and slot.start < end_time_tomorrow %}
+            {% set available_slots = available_slots + [slot] %}
+          {% endif %}
+        {% endfor %}
+
+        {# PART 4: Find the cheapest consecutive block of hours using sum with deterministic tie-breaker #}
+        {% set cheapest_sum = 999999999 %}
+        {% set best_start_time = none %}
+        {% set best_block_desc = '' %}
+
+        {% if charge_hours > 0 and (available_slots | length) >= charge_hours %}
+          {% for i in range((available_slots | length) - charge_hours + 1) %}
+            {% set current_block = available_slots[i:i+charge_hours] %}
+            {% set candidate_start = current_block[0].start %}
+            {% set candidate_end = candidate_start + timedelta(hours=charge_hours) %}
+            {% if candidate_end <= end_time_tomorrow %}
+              {% set block_sum = current_block | map(attribute='value') | sum %}
+              {% if block_sum < cheapest_sum %}
+                {% set cheapest_sum = block_sum %}
+                {% set best_start_time = candidate_start %}
+                {% set best_block_desc = candidate_start.strftime('%Y-%m-%d %H:00') ~ ' + ' ~ charge_hours ~ 'h = ' ~ (block_sum | round(3)) %}
+              {% elif block_sum == cheapest_sum and best_start_time is not none and candidate_start < best_start_time %}
+                {% set best_start_time = candidate_start %}
+                {% set best_block_desc = candidate_start.strftime('%Y-%m-%d %H:00') ~ ' + ' ~ charge_hours ~ 'h = ' ~ (block_sum | round(3)) %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {# PART 5: Output hour-of-day (0-23) #}
+        {% if best_start_time is none and charge_hours > 0 and (available_slots | length) > 0 %}
+          {# Fallback: pick earliest block that fully fits before the deadline #}
+          {% for i in range((available_slots | length) - charge_hours + 1) %}
+            {% set candidate_start = available_slots[i].start %}
+            {% set candidate_end = candidate_start + timedelta(hours=charge_hours) %}
+            {% if candidate_end <= end_time_tomorrow %}
+              {% set best_start_time = candidate_start %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+          {% if best_start_time is none %}
+            {# If still none (not enough hours to fit fully), pick earliest available hour to avoid fallback #}
+            {% set best_start_time = available_slots[0].start %}
+          {% endif %}
+        {% endif %}
+        {% if best_start_time is not none %}
+          {{ best_start_time.hour }}
+        {% else %}
+          {{ next_full_hour.hour }}
+        {% endif %}
+  - delay: "00:00:01"
+  - choose:
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: input_boolean.ev_charging_debug
+                state: "on"
+              - condition: template
+                value_template: "{{ not states('input_boolean.ev_charging_debug') in ['on','off'] }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "EV Smart Charge"
+              message: >
+                Start calc at {{ now() }} | charge_hours={{ states('sensor.ev_charging_hours_needed') }} | today_len={{ (state_attr('sensor.nordpool','today') or []) | length }} | tomorrow_len={{ (state_attr('sensor.nordpool','tomorrow') or []) | length }} | chosen_hour={{ states('input_number.charging_start') }} | duration_h={{ states('input_number.charging_time') }}
+          - service: persistent_notification.create
+            data:
+              title: "EV Smart Charge (debug)"
+              message: >
+                {% set start_hour = states('input_number.charging_start') | int(0) %}
+                {% set duration = states('input_number.charging_time') | int(0) %}
+                {% set today_len = (state_attr('sensor.nordpool','today') or []) | length %}
+                {% set tomorrow_len = (state_attr('sensor.nordpool','tomorrow') or []) | length %}
+                {% set next_full = (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)).isoformat() %}
+                {% set window_end = (today_at('08:00') + timedelta(days=1)).isoformat() %}
+                {% set tomorrow_valid = state_attr('sensor.nordpool','tomorrow_valid') %}
+                {% set t_valid = (tomorrow_valid is boolean and tomorrow_valid) or ((tomorrow_valid|string)|lower in ['true','1','yes','on']) %}
+                {% set nordpool_sensor = 'sensor.nordpool' %}
+                {% set prices_today = state_attr(nordpool_sensor, 'today') %}
+                {% set prices_tomorrow = state_attr(nordpool_sensor, 'tomorrow') %}
+                {% set hourly_data = [] %}
+                {% if prices_today is not none and prices_today|string != 'unknown' and prices_today != [] %}
+                  {% for item in prices_today %}
+                    {% if item is mapping %}
+                      {% set raw_dt = as_datetime(item.start) %}
+                      {% set dt_obj = as_local(raw_dt) %}
+                      {% set val = (item.value if 'value' in item else item.price) | float(0) %}
+                    {% else %}
+                      {% set dt_obj = today_at(loop.index0 ~ ':00') %}
+                      {% set val = item | float(0) %}
+                    {% endif %}
+                    {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+                  {% endfor %}
+                {% endif %}
+                {% if t_valid and prices_tomorrow is not none and prices_tomorrow|string != 'unknown' and prices_tomorrow != [] %}
+                  {% for item in prices_tomorrow %}
+                    {% if item is mapping %}
+                      {% set raw_dt = as_datetime(item.start) %}
+                      {% set dt_obj = as_local(raw_dt) %}
+                      {% set val = (item.value if 'value' in item else item.price) | float(0) %}
+                    {% else %}
+                      {% set dt_obj = (today_at(loop.index0 ~ ':00') + timedelta(days=1)) %}
+                      {% set val = item | float(0) %}
+                    {% endif %}
+                    {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+                  {% endfor %}
+                {% endif %}
+                {% set hourly_sorted = hourly_data | sort(attribute='start') %}
+                {% set next_full_dt = now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1) %}
+                {% set end_dt = today_at('08:00') + timedelta(days=1) %}
+                {% set available_slots = hourly_sorted | selectattr('start','ge', next_full_dt) | selectattr('start','lt', end_dt) | list %}
+                {% set avail_len = available_slots | length %}
+                Chosen start hour: {{ start_hour }} (now {{ now().hour }})\n
+                Charge hours needed: {{ states('input_number.charging_time') }}\n
+                Nordpool today: {{ today_len }} values, tomorrow: {{ tomorrow_len }} values (tomorrow_valid={{ tomorrow_valid }}, t_valid={{ t_valid }}, available_slots={{ avail_len }}).\n
+                Window searched: {{ next_full }} .. {{ window_end }}\n
+                Note: Algorithm sorts hours chronologically and minimizes total price over {{ duration }} hours; earliest start wins on ties.
+mode: single

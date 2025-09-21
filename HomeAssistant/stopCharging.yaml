@@ -1,0 +1,23 @@
+alias: EV Smart Charge - Stop Charging
+description: Turns off the EV charger when charging is complete or car is unplugged
+trigger:
+  - platform: template
+    value_template: >
+      {% set start_hour = states('input_number.charging_start') | int(0) %}
+      {% set duration_hours = states('input_number.charging_time') | int(0) %}
+      {% set start_dt = today_at('{:02d}:00'.format(start_hour)) %}
+      {% set now_dt = now() %}
+      {% if start_dt < now_dt %}
+        {% set start_dt = start_dt + timedelta(days=1) %}
+      {% endif %}
+      {% set end_dt = start_dt + timedelta(hours=duration_hours) %}
+      {{ now_dt >= end_dt }}
+  - platform: state
+    entity_id: sensor.laadimise_olek_2
+    to: "Unplugged"
+condition: []
+action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.zoe_3em
+mode: single
