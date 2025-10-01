@@ -137,7 +137,7 @@ copy-bashrc-ci()
 a()
 {
     local ARGS="$@"
-    docker compose exec -u fractory api bash -c "php artisan $ARGS"
+    docker compose exec -u ubuntu api bash -c "php artisan $ARGS"
 }
 
 s()
@@ -236,7 +236,7 @@ dl()
     		;;
 
     	  /home/priit/code/api)
-    	    docker compose exec -u fractory api bash
+    	    docker compose exec -u ubuntu api bash
     		;;
 
     	  *)
@@ -270,7 +270,7 @@ up()
 	  /home/priit/code/api)
 		docker-compose up -d
 		docker compose exec -u root api bash -c "chmod 777 /var/log/newrelic/newrelic-daemon.log"
-		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/home/fractory/.bashrc
+		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/home/ubuntu/.bashrc
 		docker cp ~/.bashrc $(docker ps |grep api|awk '{print $1}' | head -1):/root/.bashrc
 		;;
 

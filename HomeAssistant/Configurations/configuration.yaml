@@ -1,0 +1,71 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+#climate: !include climate.yaml
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24
+
+template: !include template.yaml
+
+sensor:
+  - platform: nordpool
+    # Country/region to get the energy prices for.
+    region: "EE"
+
+    # Override HA local currency used to fetch the prices from the API.
+    currency: "EUR"
+
+    # Add Value Added Taxes (VAT)?
+    VAT: True
+
+    # Energy price rounding precision.
+    precision: 3
+
+    # Percentage of average price to set the low price attribute
+    # low_price = hour_price < average * low_price_cutoff
+    low_price_cutoff: 0.95
+
+    # Display price in cents in stead of (for example) Euros.
+    price_in_cents: True
+
+    # Price displayed for MWh, kWh or Wh
+    price_type: kWh
+
+    # Template to specify additional cost to be added to the tariff.
+    # The template price is in EUR, DKK, NOK or SEK (not in cents).
+    # For example: "{{ current_price * 0.19 + 0.023 | float}}"
+    additional_costs: "{{10.0|float}}"
+
+  - platform: template
+    sensors:
+      is_ford_number_plate_recognised_bay:
+        friendly_name: "Ford number plate detected"
+        value_template: "{{ '241KZL' in state_attr('image_processing.platerecognizer_parking_bay', 'watched_plates') }}"
+      plate_recognizer_api_call_remaining:
+        friendly_name: "Plate Recognizer API calls remaining"
+        value_template: "{{ state_attr('image_processing.platerecognizer_parking_bay', 'statistics')['calls_remaining'] }}"
+
+image_processing:
+  - platform: platerecognizer
+    api_token: a2aa07365b669a0703d918845c54317974aad278
+    regions:
+      - ee
+    watched_plates:
+      - 241kzl
+    save_file_folder: /config/images/platerecognizer/
+    save_timestamped_file: True
+    always_save_latest_file: True
+    detection_rule: strict
+    region: strict
+    source:
+      - entity_id: camera.varav_sujuv

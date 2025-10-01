@@ -24,44 +24,90 @@ action:
         {% set charge_hours = states('input_number.charging_time') | int(0) %}
         {% set end_time_str = '08:00' %}
 
-        {# PART 2: Get price arrays #}
+        {# PART 2: Get price arrays and convert 15-min intervals to hourly averages #}
         {% set prices_today = state_attr(nordpool_sensor, 'today') %}
         {% set prices_tomorrow = state_attr(nordpool_sensor, 'tomorrow') %}
         {% set tomorrow_valid = state_attr(nordpool_sensor, 'tomorrow_valid') %}
         {% set t_valid = (tomorrow_valid is boolean and tomorrow_valid) or ((tomorrow_valid|string)|lower in ['true','1','yes','on']) %}
 
-        {# Normalize to a list of {start: datetime, value: float} #}
-        {% set hourly_data = [] %}
+        {# Collect all 15-minute intervals into a list #}
+        {% set all_intervals = [] %}
 
-        {# Helper to normalize one day list. If items are dicts with 'start'/'value', use them; else use index hour. #}
         {% if prices_today is not none and prices_today|string != 'unknown' and prices_today != [] %}
           {% for item in prices_today %}
             {% if item is mapping %}
-              {# Use as_datetime to safely parse, then convert to local exactly once #}
-              {% set raw_dt = as_datetime(item.start) %}
-              {% set dt_obj = as_local(raw_dt) %}
+              {# Handle edge case where time might be "24:00" - convert to next day 00:00 #}
+              {% set start_str = item.start | string %}
+              {% if '24:00' in start_str %}
+                {% set fixed_start = start_str.replace('24:00', '00:00') %}
+                {% set raw_dt = as_datetime(fixed_start) %}
+                {% set dt_obj = as_local(raw_dt) + timedelta(days=1) %}
+              {% else %}
+                {% set raw_dt = as_datetime(item.start) %}
+                {% set dt_obj = as_local(raw_dt) %}
+              {% endif %}
               {% set val = (item.value if 'value' in item else item.price) | float(0) %}
             {% else %}
               {% set dt_obj = today_at(loop.index0 ~ ':00') %}
               {% set val = item | float(0) %}
             {% endif %}
-            {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+            {% set all_intervals = all_intervals + [{'start': dt_obj, 'value': val}] %}
           {% endfor %}
         {% endif %}
 
         {% if t_valid and prices_tomorrow is not none and prices_tomorrow|string != 'unknown' and prices_tomorrow != [] %}
           {% for item in prices_tomorrow %}
             {% if item is mapping %}
-              {% set raw_dt = as_datetime(item.start) %}
-              {% set dt_obj = as_local(raw_dt) %}
+              {# Handle edge case where time might be "24:00" - convert to next day 00:00 #}
+              {% set start_str = item.start | string %}
+              {% if '24:00' in start_str %}
+                {% set fixed_start = start_str.replace('24:00', '00:00') %}
+                {% set raw_dt = as_datetime(fixed_start) %}
+                {% set dt_obj = as_local(raw_dt) + timedelta(days=1) %}
+              {% else %}
+                {% set raw_dt = as_datetime(item.start) %}
+                {% set dt_obj = as_local(raw_dt) %}
+              {% endif %}
               {% set val = (item.value if 'value' in item else item.price) | float(0) %}
             {% else %}
               {% set dt_obj = (today_at(loop.index0 ~ ':00') + timedelta(days=1)) %}
               {% set val = item | float(0) %}
             {% endif %}
-            {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+            {% set all_intervals = all_intervals + [{'start': dt_obj, 'value': val}] %}
           {% endfor %}
         {% endif %}
+
+        {# Convert 15-minute intervals to hourly averages #}
+        {% set intervals_sorted = all_intervals | sort(attribute='start') %}
+        {% set hourly_data = [] %}
+
+        {# Group intervals by hour and calculate averages #}
+        {% for interval in intervals_sorted %}
+          {% set interval_hour = interval.start.replace(minute=0, second=0, microsecond=0) %}
+
+          {# Check if this hour already exists in hourly_data #}
+          {% set hour_exists = false %}
+          {% for hour_slot in hourly_data %}
+            {% if hour_slot.start == interval_hour %}
+              {% set hour_exists = true %}
+            {% endif %}
+          {% endfor %}
+
+          {# If hour doesn't exist yet, calculate average for this hour #}
+          {% if not hour_exists %}
+            {% set hour_intervals = [] %}
+            {% for check_interval in intervals_sorted %}
+              {% set check_hour = check_interval.start.replace(minute=0, second=0, microsecond=0) %}
+              {% if check_hour == interval_hour %}
+                {% set hour_intervals = hour_intervals + [check_interval.value] %}
+              {% endif %}
+            {% endfor %}
+            {% if hour_intervals | length > 0 %}
+              {% set avg_price = (hour_intervals | sum) / (hour_intervals | length) %}
+              {% set hourly_data = hourly_data + [{'start': interval_hour, 'value': avg_price}] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
 
         {# PART 3: Filter available slots between next full hour and the deadline. #}
         {% set now_dt = now() %}
@@ -154,33 +200,77 @@ action:
                 {% set nordpool_sensor = 'sensor.nordpool' %}
                 {% set prices_today = state_attr(nordpool_sensor, 'today') %}
                 {% set prices_tomorrow = state_attr(nordpool_sensor, 'tomorrow') %}
-                {% set hourly_data = [] %}
+
+                {# Collect all 15-minute intervals #}
+                {% set all_intervals = [] %}
                 {% if prices_today is not none and prices_today|string != 'unknown' and prices_today != [] %}
                   {% for item in prices_today %}
                     {% if item is mapping %}
-                      {% set raw_dt = as_datetime(item.start) %}
-                      {% set dt_obj = as_local(raw_dt) %}
+                      {# Handle edge case where time might be "24:00" #}
+                      {% set start_str = item.start | string %}
+                      {% if '24:00' in start_str %}
+                        {% set fixed_start = start_str.replace('24:00', '00:00') %}
+                        {% set raw_dt = as_datetime(fixed_start) %}
+                        {% set dt_obj = as_local(raw_dt) + timedelta(days=1) %}
+                      {% else %}
+                        {% set raw_dt = as_datetime(item.start) %}
+                        {% set dt_obj = as_local(raw_dt) %}
+                      {% endif %}
                       {% set val = (item.value if 'value' in item else item.price) | float(0) %}
                     {% else %}
                       {% set dt_obj = today_at(loop.index0 ~ ':00') %}
                       {% set val = item | float(0) %}
                     {% endif %}
-                    {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+                    {% set all_intervals = all_intervals + [{'start': dt_obj, 'value': val}] %}
                   {% endfor %}
                 {% endif %}
                 {% if t_valid and prices_tomorrow is not none and prices_tomorrow|string != 'unknown' and prices_tomorrow != [] %}
                   {% for item in prices_tomorrow %}
                     {% if item is mapping %}
-                      {% set raw_dt = as_datetime(item.start) %}
-                      {% set dt_obj = as_local(raw_dt) %}
+                      {# Handle edge case where time might be "24:00" #}
+                      {% set start_str = item.start | string %}
+                      {% if '24:00' in start_str %}
+                        {% set fixed_start = start_str.replace('24:00', '00:00') %}
+                        {% set raw_dt = as_datetime(fixed_start) %}
+                        {% set dt_obj = as_local(raw_dt) + timedelta(days=1) %}
+                      {% else %}
+                        {% set raw_dt = as_datetime(item.start) %}
+                        {% set dt_obj = as_local(raw_dt) %}
+                      {% endif %}
                       {% set val = (item.value if 'value' in item else item.price) | float(0) %}
                     {% else %}
                       {% set dt_obj = (today_at(loop.index0 ~ ':00') + timedelta(days=1)) %}
                       {% set val = item | float(0) %}
                     {% endif %}
-                    {% set hourly_data = hourly_data + [{'start': dt_obj, 'value': val}] %}
+                    {% set all_intervals = all_intervals + [{'start': dt_obj, 'value': val}] %}
                   {% endfor %}
                 {% endif %}
+
+                {# Convert to hourly averages #}
+                {% set intervals_sorted = all_intervals | sort(attribute='start') %}
+                {% set hourly_data = [] %}
+                {% for interval in intervals_sorted %}
+                  {% set interval_hour = interval.start.replace(minute=0, second=0, microsecond=0) %}
+                  {% set hour_exists = false %}
+                  {% for hour_slot in hourly_data %}
+                    {% if hour_slot.start == interval_hour %}
+                      {% set hour_exists = true %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if not hour_exists %}
+                    {% set hour_intervals = [] %}
+                    {% for check_interval in intervals_sorted %}
+                      {% set check_hour = check_interval.start.replace(minute=0, second=0, microsecond=0) %}
+                      {% if check_hour == interval_hour %}
+                        {% set hour_intervals = hour_intervals + [check_interval.value] %}
+                      {% endif %}
+                    {% endfor %}
+                    {% if hour_intervals | length > 0 %}
+                      {% set avg_price = (hour_intervals | sum) / (hour_intervals | length) %}
+                      {% set hourly_data = hourly_data + [{'start': interval_hour, 'value': avg_price}] %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
                 {% set hourly_sorted = hourly_data | sort(attribute='start') %}
                 {% set next_full_dt = now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1) %}
                 {% set end_dt = today_at('08:00') + timedelta(days=1) %}
