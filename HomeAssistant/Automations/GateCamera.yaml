@@ -1,0 +1,34 @@
+alias: Gate Camera - PTZ Position Based on Sun
+description: >-
+  Automatically adjusts the gate camera (varav) PTZ position based on time of day.
+  Moves to "Plats" position at sunset for nighttime monitoring,
+  and returns to "Tee" position at sunrise for daytime monitoring.
+trigger:
+  - platform: sun
+    event: sunset
+    id: sunset
+  - platform: sun
+    event: sunrise
+    id: sunrise
+condition: []
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: sunset
+        sequence:
+          - service: select.select_option
+            target:
+              entity_id: select.varav_ptz_eelseadistus
+            data:
+              option: Plats
+      - conditions:
+          - condition: trigger
+            id: sunrise
+        sequence:
+          - service: select.select_option
+            target:
+              entity_id: select.varav_ptz_eelseadistus
+            data:
+              option: Tee
+mode: single

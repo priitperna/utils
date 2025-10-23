@@ -87,7 +87,13 @@ This repository contains Home Assistant configurations and automations that run 
 ### Working with Home Assistant Configurations
 
 **IMPORTANT - Entity IDs:**
-When creating or modifying Home Assistant automations, scripts, or templates, **ALWAYS ask the user for specific entity IDs** rather than making them up or using placeholder names. Entity IDs are installation-specific and must match the user's actual Home Assistant setup.
+When creating or modifying Home Assistant automations, scripts, or templates, **ALWAYS check `HomeAssistant/entities.txt`** for available entity IDs rather than making them up or using placeholder names. Entity IDs are installation-specific and must match the user's actual Home Assistant setup.
+
+**Available Entity Reference:**
+- The file `HomeAssistant/entities.txt` contains a complete list of all 751 entities available in this Home Assistant instance
+- **Always read this file first** when creating automations to find the exact entity IDs to use
+- Search for relevant entities by type (e.g., `sensor.`, `switch.`, `light.`, `binary_sensor.`)
+- Use grep or file search to find specific devices or features (e.g., search "temperature", "charging", "light")
 
 **Why this matters:**
 - Entity IDs vary between installations (e.g., `sensor.temperature_living_room` vs `sensor.temp_lr`)
@@ -96,21 +102,25 @@ When creating or modifying Home Assistant automations, scripts, or templates, **
 - Generic placeholders like `sensor.example` or `light.placeholder` are not helpful
 
 **How to handle entity IDs:**
-1. **Ask first** - Request the specific entity IDs from the user before writing automations
-2. **Be specific** - Ask for each entity type needed (sensors, switches, lights, etc.)
-3. **Confirm format** - Verify the entity domain matches the usage (e.g., `switch.` for switches, `sensor.` for sensors)
-4. **List requirements** - If multiple entities are needed, list them all upfront
+1. **Check entities.txt first** - Read `HomeAssistant/entities.txt` to find available entities
+2. **Search for matches** - Look for entities that match the required functionality
+3. **Verify entity domain** - Confirm the entity domain matches the usage (e.g., `switch.` for switches, `sensor.` for sensors)
+4. **Ask for clarification** - If multiple entities could work or none are found, ask the user which to use
+5. **List requirements** - If creating complex automations, list all entities being used upfront
 
 **Example interaction:**
 ```
 User: Create an automation to turn on the lights when motion is detected
-Assistant: I'll help you create that automation. To make it ready for copy-paste testing,
-I need the following entity IDs from your Home Assistant:
-- Motion sensor entity ID (e.g., binary_sensor.motion_living_room)
-- Light entity ID to control (e.g., light.living_room)
-- (Optional) Any condition sensors or helper entities
+Assistant: I'll help you create that automation. Let me first check entities.txt
+to find available motion sensors and lights in your system.
 
-Once you provide these, I'll create the complete automation.
+[After reading entities.txt]
+
+I found the following entities:
+- Motion: binary_sensor.varav_motion, binary_sensor.parkla_motion, binary_sensor.tall_vasak_motion
+- Lights: light.kanala_laelamp_tuled_2, light.radikas_tuled, light.ruuter_katuse_all_tuled_2
+
+Which motion sensor and light would you like to use for this automation?
 ```
 
 ### Modern Home Assistant Best Practices
